@@ -6,6 +6,7 @@ class MenuBarManager: ObservableObject {
     private var statusItem: NSStatusItem?
     private var appleMusicMonitor: SimplifiedAppleMusicMonitor
     private var musicServiceManager: MusicServiceManager
+    private var settingsWindowController: SettingsWindowController?
     
     @Published var isSearching: Bool = false
     @Published var lastError: String?
@@ -177,6 +178,13 @@ class MenuBarManager: ObservableObject {
         
         menu.addItem(NSMenuItem.separator())
         
+        // Settings option
+        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
         // Quit option
         let quitItem = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
         quitItem.target = self
@@ -213,6 +221,16 @@ class MenuBarManager: ObservableObject {
                 await musicServiceManager.searchAllServices(for: currentTrack)
             }
         }
+    }
+    
+    @objc private func openSettings() {
+        if settingsWindowController == nil {
+            settingsWindowController = SettingsWindowController()
+        }
+        
+        settingsWindowController?.showWindow(nil)
+        settingsWindowController?.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
     
     @objc private func quit() {

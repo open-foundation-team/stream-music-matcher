@@ -4,8 +4,6 @@ import Foundation
 class SpotifyServiceProvider: MusicServiceProvider {
     let serviceName = "Spotify"
     
-    private let clientId = "1d2f87861807445eaeb716f9680ca906" // Replace with actual client ID
-    private let clientSecret = "b851ce4823344cadafe89d0792ef4967" // Replace with actual client secret
     private var accessToken: String?
     private var tokenExpirationDate: Date?
     
@@ -13,8 +11,17 @@ class SpotifyServiceProvider: MusicServiceProvider {
     private let tokenURL = "https://accounts.spotify.com/api/token"
     
     var isConfigured: Bool {
-        return !clientId.isEmpty && clientId != "YOUR_SPOTIFY_CLIENT_ID" &&
-               !clientSecret.isEmpty && clientSecret != "YOUR_SPOTIFY_CLIENT_SECRET"
+        let settingsManager = SettingsManager.shared
+        return settingsManager.hasAPIKey(for: .spotifyClientId) &&
+               settingsManager.hasAPIKey(for: .spotifyClientSecret)
+    }
+    
+    private var clientId: String? {
+        return SettingsManager.shared.retrieveAPIKey(for: .spotifyClientId)
+    }
+    
+    private var clientSecret: String? {
+        return SettingsManager.shared.retrieveAPIKey(for: .spotifyClientSecret)
     }
     
     // MARK: - Authentication
@@ -24,6 +31,12 @@ class SpotifyServiceProvider: MusicServiceProvider {
            let expirationDate = tokenExpirationDate,
            Date() < expirationDate {
             return token
+        }
+        
+        // Get credentials from settings
+        guard let clientId = clientId,
+              let clientSecret = clientSecret else {
+            throw MusicServiceError.notConfigured
         }
         
         // Request new token using Client Credentials flow

@@ -4,12 +4,14 @@ import Foundation
 class YouTubeMusicServiceProvider: MusicServiceProvider {
     let serviceName = "YouTube Music"
     
-    // YouTube Data API v3 configuration
-    private let apiKey = "AIzaSyDMU3iGySkC8VTzLWvZ21qDetrYtSGiyWU" // Replace with actual API key
     private let baseURL = "https://www.googleapis.com/youtube/v3"
     
     var isConfigured: Bool {
-        return !apiKey.isEmpty && apiKey != "YOUR_YOUTUBE_API_KEY"
+        return SettingsManager.shared.hasAPIKey(for: .youtubeAPIKey)
+    }
+    
+    private var apiKey: String? {
+        return SettingsManager.shared.retrieveAPIKey(for: .youtubeAPIKey)
     }
     
     func searchTrack(title: String, artist: String, album: String) async throws -> MusicServiceResult? {
@@ -33,6 +35,10 @@ class YouTubeMusicServiceProvider: MusicServiceProvider {
     }
     
     private func performSearch(query: String, title: String, artist: String, album: String) async throws -> MusicServiceResult? {
+        guard let apiKey = apiKey else {
+            throw MusicServiceError.notConfigured
+        }
+        
         guard let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let url = URL(string: "\(baseURL)/search?part=snippet&type=video&q=\(encodedQuery)&maxResults=5&key=\(apiKey)") else {
             throw MusicServiceError.invalidResponse
