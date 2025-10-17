@@ -1,127 +1,147 @@
-# Music Stream Matcher
+# Music Stream Matcher - Enhanced Edition
 
-A macOS menu bar application that detects currently playing music in Apple Music and finds the equivalent song on Spotify, providing easy access to share links and opening tracks in Spotify.
+A macOS menu bar application that detects currently playing music in Apple Music and finds equivalent songs across **multiple streaming platforms**, providing easy access to share links and opening tracks in your preferred service.
 
-## Features
+## 🆕 Enhanced Features
+
+- **Multi-Platform Support**: Find tracks on both Spotify and YouTube Music simultaneously
+- **Modular Architecture**: Easy addition of new music streaming services
+- **Concurrent Search**: All services search in parallel for faster results
+- **Smart Matching**: Intelligent algorithms to find the best matches
+- **Service-Specific Actions**: Dedicated buttons for each platform
+
+## 🎯 Core Features
 
 - **Real-time Music Detection**: Continuously monitors Apple Music for currently playing tracks
-- **Spotify Matching**: Automatically searches Spotify's catalog for matching songs
+- **Multi-Service Matching**: Automatically searches multiple streaming catalogs
 - **Menu Bar Integration**: Clean, native macOS menu bar interface
 - **Interactive Options**:
-  - Open matched tracks directly in Spotify
-  - Copy Spotify share links to clipboard
-  - Real-time status updates
+  - Open matched tracks in Spotify or YouTube Music
+  - Copy service-specific share links to clipboard
+  - Real-time status updates across all services
 - **Customizable Icon**: Default icon provided with support for custom replacements
 
-## Requirements
+## 🏗️ Architecture
 
-- macOS 13.0 or later
-- Xcode 15.0 or later
-- Apple Music app
-- Spotify account (for opening tracks)
-- Spotify Web API credentials
+### Modular Design
+- **Protocol-Based Providers**: Each music service implements `MusicServiceProvider`
+- **Concurrent Operations**: All services search simultaneously for optimal performance
+- **Clean Separation**: Independent service implementations for maintainability
+- **Scalable Framework**: Easy addition of new streaming platforms
 
-## Setup Instructions
+### Core Components
+- **<mcfile name="main.swift" path="/Users/christian.smith/github/weekend-projects/music-stream-matcher/Sources/main.swift"></mcfile>**: App entry point and delegate
+- **<mcfile name="MenuBarManager.swift" path="/Users/christian.smith/github/weekend-projects/music-stream-matcher/Sources/MenuBarManager.swift"></mcfile>**: Menu bar UI and service coordination
+- **<mcfile name="MusicServiceProvider.swift" path="/Users/christian.smith/github/weekend-projects/music-stream-matcher/Sources/MusicServiceProvider.swift"></mcfile>**: Protocol and manager for music services
+- **<mcfile name="SimplifiedAppleMusicMonitor.swift" path="/Users/christian.smith/github/weekend-projects/music-stream-matcher/Sources/SimplifiedAppleMusicMonitor.swift"></mcfile>**: Apple Music integration via AppleScript
+- **<mcfile name="SpotifyServiceProvider.swift" path="/Users/christian.smith/github/weekend-projects/music-stream-matcher/Sources/SpotifyServiceProvider.swift"></mcfile>**: Spotify Web API integration
+- **<mcfile name="YouTubeMusicServiceProvider.swift" path="/Users/christian.smith/github/weekend-projects/music-stream-matcher/Sources/YouTubeMusicServiceProvider.swift"></mcfile>**: YouTube Music integration via YouTube Data API
+- **<mcfile name="TrackInfo.swift" path="/Users/christian.smith/github/weekend-projects/music-stream-matcher/Sources/TrackInfo.swift"></mcfile>**: Data model for track information
 
-### 1. Spotify API Setup
+## 🚀 Quick Setup
 
-1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
-2. Create a new app
-3. Note your **Client ID** and **Client Secret**
-4. Open `SpotifyAPI.swift` and replace the placeholder values:
-   ```swift
-   private let clientId = "YOUR_SPOTIFY_CLIENT_ID"
-   private let clientSecret = "YOUR_SPOTIFY_CLIENT_SECRET"
-   ```
+### 1. API Configuration
+
+#### Spotify (Required)
+1. Get credentials from [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
+2. Update `Sources/SpotifyServiceProvider.swift` with your Client ID and Secret
+
+#### YouTube Music (Optional)
+1. Get API key from [Google Cloud Console](https://console.cloud.google.com/)
+2. Enable YouTube Data API v3
+3. Update `Sources/YouTubeMusicServiceProvider.swift` with your API key
 
 ### 2. Build and Run
+```bash
+swift build
+./.build/debug/MusicStreamMatcher
+```
 
-1. Open `MusicStreamMatcher.xcodeproj` in Xcode
-2. Select your development team in the project settings
-3. Build and run the project (⌘+R)
+## 📱 Enhanced User Experience
 
-### 3. Permissions
+### Multi-Service Menu
+```
+♪ Current Track - Artist
+   from Album Name
+─────────────────────────
+🎵 Found on Spotify
+   Open in Spotify
+   Copy Spotify Link
+─────────────────────────
+🎵 Found on YouTube Music
+   Open in YouTube Music
+   Copy YouTube Link
+─────────────────────────
+Refresh
+Quit
+```
 
-The app will request permission to:
-- Access Apple Music (for track detection)
-- Send Apple Events (for Apple Music integration)
+### Smart Features
+- **Concurrent Search**: All services search simultaneously
+- **Graceful Degradation**: Failed services don't block successful ones
+- **Intelligent Matching**: Filters out covers, remixes, and low-quality matches
+- **Service Fallbacks**: Multiple URL types per service (app, web, share)
 
-Grant these permissions when prompted.
+## 🔧 Adding New Services
 
-## Usage
+The modular architecture makes adding new streaming services straightforward:
 
-1. **Launch the App**: The app runs as a menu bar application (look for the music note icon)
-2. **Play Music**: Start playing music in Apple Music
-3. **View Matches**: Click the menu bar icon to see:
-   - Currently playing track information
-   - Spotify match status
-   - Interactive options when a match is found
-4. **Actions**:
-   - **Open in Spotify**: Launches the matched track in Spotify
-   - **Copy Share Link**: Copies the Spotify URL to your clipboard
-   - **Refresh**: Manually refresh the Spotify search
+```swift
+class NewServiceProvider: MusicServiceProvider {
+    let serviceName = "New Service"
+    var isConfigured: Bool { /* check credentials */ }
+    
+    func searchTrack(title: String, artist: String, album: String) async throws -> MusicServiceResult? {
+        // Implement service-specific search logic
+    }
+}
+```
 
-## Menu States
+Then add to `MusicServiceManager.setupProviders()`.
 
-- **No Music Playing**: Shows "No music currently playing"
-- **Music Paused**: Shows "Music paused" with track info
-- **Searching**: Shows "Searching Spotify..." while finding matches
-- **Match Found**: Shows Spotify track with action buttons
-- **No Match**: Shows "Not found on Spotify"
-- **Error**: Displays error message if API calls fail
+## 🎵 Supported Services
 
-## Customization
+| Service | Status | Features |
+|---------|--------|----------|
+| **Spotify** | ✅ Full Support | Web API, Native App Links, Share URLs |
+| **YouTube Music** | ✅ Full Support | YouTube Data API, Web Player, Share URLs |
+| **Apple Music** | 🔄 Future | Awaiting official API |
+| **Tidal** | 📋 Planned | Community requested |
 
-### Custom Menu Bar Icon
+## 🛠️ Requirements
 
-1. Add your custom icon to the Assets catalog
-2. Use the `setCustomIcon(_:)` method:
-   ```swift
-   menuBarManager.setCustomIcon("YourCustomIconName")
-   ```
-3. Reset to default with `resetToDefaultIcon()`
+- macOS 13.0 or later
+- Swift 5.9 or later
+- Apple Music app (for track detection)
+- Internet connection (for service APIs)
 
-## Architecture
+## 🔒 Privacy & Security
 
-- **MusicStreamMatcherApp**: Main app entry point
-- **MenuBarManager**: Handles menu bar UI and coordinates components
-- **AppleMusicMonitor**: Monitors Apple Music using ScriptingBridge
-- **SpotifyAPI**: Handles Spotify Web API integration
-- **TrackInfo**: Data model for track information
-
-## Troubleshooting
-
-### Common Issues
-
-1. **"No music currently playing" when music is playing**:
-   - Ensure Apple Music is running and playing
-   - Check that the app has Apple Events permission
-
-2. **Spotify search always fails**:
-   - Verify your Spotify API credentials
-   - Check your internet connection
-   - Ensure your Spotify app credentials are valid
-
-3. **App doesn't appear in menu bar**:
-   - Check that LSUIElement is set to true in Info.plist
-   - Restart the app
-
-### Debug Mode
-
-For development, you can add logging to track API calls and responses in the SpotifyAPI and AppleMusicMonitor classes.
-
-## Privacy
-
-This app:
 - Only accesses currently playing track metadata from Apple Music
-- Makes API calls to Spotify's public search endpoints
-- Does not store or transmit personal data
-- Runs entirely locally except for Spotify API calls
+- API calls limited to public search endpoints
+- No personal data stored or transmitted
+- Runs entirely locally except for service API calls
+- Credentials stored in source code (update for production use)
 
-## License
+## 📈 Performance
+
+- **Concurrent Search**: Multiple services searched simultaneously
+- **Efficient Polling**: Apple Music checked every 2 seconds
+- **Smart Caching**: API tokens cached and reused
+- **Minimal Resources**: Lightweight background operation
+
+## 🤝 Contributing
+
+The modular architecture welcomes contributions:
+- Add new streaming service providers
+- Improve search algorithms
+- Enhance UI/UX
+- Add configuration options
+
+## 📄 License
 
 This project is provided as-is for educational and personal use.
 
-## Contributing
+---
 
-Feel free to submit issues and enhancement requests!
+**🎵 Discover music across all your favorite platforms with one click! 🎵**

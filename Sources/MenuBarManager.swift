@@ -5,15 +5,16 @@ import Combine
 class MenuBarManager: ObservableObject {
     private var statusItem: NSStatusItem?
     private var appleMusicMonitor: SimplifiedAppleMusicMonitor
-    private var spotifyAPI: SpotifyAPI
+    private var musicServiceManager: MusicServiceManager
     
-    @Published var currentSpotifyTrack: TrackInfo?
     @Published var isSearching: Bool = false
     @Published var lastError: String?
     
+    private var cancellables = Set<AnyCancellable>()
+    
     init() {
         self.appleMusicMonitor = SimplifiedAppleMusicMonitor()
-        self.spotifyAPI = SpotifyAPI()
+        self.musicServiceManager = MusicServiceManager()
         
         setupStatusItem()
         setupObservers()
@@ -69,58 +70,32 @@ class MenuBarManager: ObservableObject {
                 self?.handleTrackChange(track)
             }
             .store(in: &cancellables)
+        
+        // Observe changes in music service search results
+        musicServiceManager.$searchResults
+            .sink { [weak self] _ in
+                self?.updateMenu()
+            }
+            .store(in: &cancellables)
+        
+        // Observe search status changes
+        musicServiceManager.$isSearching
+            .sink { [weak self] isSearching in
+                self?.isSearching = isSearching
+                self?.updateMenu()
+            }
+            .store(in: &cancellables)
     }
-    
-    private var cancellables = Set<AnyCancellable>()
     
     private func handleTrackChange(_ track: TrackInfo?) {
         guard let track = track else {
-            currentSpotifyTrack = nil
             updateMenu()
             return
         }
         
-        // Search for Spotify match
+        // Search all music services for matches
         Task {
-            await searchSpotifyMatch(for: track)
-        }
-    }
-    
-    private func searchSpotifyMatch(for track: TrackInfo) async {
-        DispatchQueue.main.async {
-            self.isSearching = true
-            self.lastError = nil
-        }
-        
-        do {
-            // Try exact search first
-            var spotifyTrack = try await spotifyAPI.searchTrack(
-                title: track.title,
-                artist: track.artist,
-                album: track.album
-            )
-            
-            // If no exact match, try simpler search
-            if spotifyTrack == nil {
-                spotifyTrack = try await spotifyAPI.searchTrackSimple(
-                    title: track.title,
-                    artist: track.artist
-                )
-            }
-            
-            DispatchQueue.main.async {
-                self.currentSpotifyTrack = spotifyTrack
-                self.isSearching = false
-                self.updateMenu()
-            }
-            
-        } catch {
-            DispatchQueue.main.async {
-                self.lastError = error.localizedDescription
-                self.isSearching = false
-                self.currentSpotifyTrack = nil
-                self.updateMenu()
-            }
+            await musicServiceManager.searchAllServices(for: track)
         }
     }
     
@@ -142,31 +117,43 @@ class MenuBarManager: ObservableObject {
                 
                 menu.addItem(NSMenuItem.separator())
                 
-                // Spotify section
+                // Music services section
                 if isSearching {
-                    let searchingItem = NSMenuItem(title: "🔍 Searching Spotify...", action: nil, keyEquivalent: "")
+                    let searchingItem = NSMenuItem(title: "🔍 Searching music services...", action: nil, keyEquivalent: "")
                     searchingItem.isEnabled = false
                     menu.addItem(searchingItem)
-                } else if let spotifyTrack = currentSpotifyTrack {
-                    let spotifyItem = NSMenuItem(title: "🎵 Found on Spotify", action: nil, keyEquivalent: "")
-                    spotifyItem.isEnabled = false
-                    menu.addItem(spotifyItem)
+                } else if musicServiceManager.hasResults() {
+                    // Show results for each service
+                    let availableServices = musicServiceManager.getAvailableServices()
                     
-                    // Open in Spotify
-                    let openItem = NSMenuItem(title: "Open in Spotify", action: #selector(openInSpotify), keyEquivalent: "")
-                    openItem.target = self
-                    menu.addItem(openItem)
-                    
-                    // Copy share link
-                    let copyItem = NSMenuItem(title: "Copy Share Link", action: #selector(copySpotifyLink), keyEquivalent: "")
-                    copyItem.target = self
-                    menu.addItem(copyItem)
+                    for serviceName in availableServices {
+                        if let result = musicServiceManager.getResult(for: serviceName) {
+                            // Service header
+                            let serviceItem = NSMenuItem(title: "🎵 Found on \(serviceName)", action: nil, keyEquivalent: "")
+                            serviceItem.isEnabled = false
+                            menu.addItem(serviceItem)
+                            
+                            // Open in service
+                            let openItem = NSMenuItem(title: "   Open in \(serviceName)", action: #selector(openInMusicService(_:)), keyEquivalent: "")
+                            openItem.target = self
+                            openItem.representedObject = result
+                            menu.addItem(openItem)
+                            
+                            // Copy share link
+                            let copyItem = NSMenuItem(title: "   Copy \(serviceName) Link", action: #selector(copyMusicServiceLink(_:)), keyEquivalent: "")
+                            copyItem.target = self
+                            copyItem.representedObject = result
+                            menu.addItem(copyItem)
+                            
+                            menu.addItem(NSMenuItem.separator())
+                        }
+                    }
                 } else if let error = lastError {
                     let errorItem = NSMenuItem(title: "⚠️ \(error)", action: nil, keyEquivalent: "")
                     errorItem.isEnabled = false
                     menu.addItem(errorItem)
                 } else {
-                    let notFoundItem = NSMenuItem(title: "❌ Not found on Spotify", action: nil, keyEquivalent: "")
+                    let notFoundItem = NSMenuItem(title: "❌ No matches found", action: nil, keyEquivalent: "")
                     notFoundItem.isEnabled = false
                     menu.addItem(notFoundItem)
                 }
@@ -198,28 +185,32 @@ class MenuBarManager: ObservableObject {
         statusItem?.menu = menu
     }
     
-    @objc private func openInSpotify() {
-        guard let spotifyURL = currentSpotifyTrack?.spotifyURL,
-              let url = URL(string: spotifyURL) else { return }
+    @objc private func openInMusicService(_ sender: NSMenuItem) {
+        guard let result = sender.representedObject as? MusicServiceResult else { return }
         
-        NSWorkspace.shared.open(url)
+        // Try app URL first, then web player URL, then share URL
+        let urlToOpen = result.appURL ?? result.webPlayerURL ?? result.shareURL
+        
+        if let url = URL(string: urlToOpen) {
+            NSWorkspace.shared.open(url)
+        }
     }
     
-    @objc private func copySpotifyLink() {
-        guard let spotifyURL = currentSpotifyTrack?.spotifyURL else { return }
+    @objc private func copyMusicServiceLink(_ sender: NSMenuItem) {
+        guard let result = sender.representedObject as? MusicServiceResult else { return }
         
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.setString(spotifyURL, forType: .string)
+        pasteboard.setString(result.shareURL, forType: .string)
         
         // Show temporary feedback
-        showNotification(title: "Copied!", message: "Spotify link copied to clipboard")
+        showNotification(title: "Copied!", message: "\(result.serviceProvider) link copied to clipboard")
     }
     
     @objc private func refresh() {
         if let currentTrack = appleMusicMonitor.currentTrack {
             Task {
-                await searchSpotifyMatch(for: currentTrack)
+                await musicServiceManager.searchAllServices(for: currentTrack)
             }
         }
     }
