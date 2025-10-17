@@ -86,6 +86,13 @@ class MenuBarManager: ObservableObject {
                 self?.updateMenu()
             }
             .store(in: &cancellables)
+        
+        // Observe changes in provider enabled state
+        SettingsManager.shared.$enabledProviders
+            .sink { [weak self] _ in
+                self?.updateMenu()
+            }
+            .store(in: &cancellables)
     }
     
     private func handleTrackChange(_ track: TrackInfo?) {

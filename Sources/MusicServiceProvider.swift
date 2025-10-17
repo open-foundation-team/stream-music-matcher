@@ -38,7 +38,8 @@ class MusicServiceManager: ObservableObject {
     @Published var isSearching: Bool = false
     @Published var lastError: String?
     
-    private var providers: [any MusicServiceProvider] = []
+    private var allProviders: [any MusicServiceProvider] = []
+    private let settingsManager = SettingsManager.shared
     
     init() {
         setupProviders()
@@ -46,8 +47,16 @@ class MusicServiceManager: ObservableObject {
     
     private func setupProviders() {
         // Initialize all available music service providers
-        providers.append(SpotifyServiceProvider())
-        providers.append(YouTubeMusicServiceProvider())
+        allProviders.append(SpotifyServiceProvider())
+        allProviders.append(YouTubeMusicServiceProvider())
+    }
+    
+    private func getEnabledProviders() -> [any MusicServiceProvider] {
+        return allProviders.filter { provider in
+            let isConfigured = provider.isConfigured
+            let isEnabled = settingsManager.isProviderEnabled(provider.serviceName)
+            return isConfigured && isEnabled
+        }
     }
     
     func searchAllServices(for track: TrackInfo) async {
@@ -57,9 +66,12 @@ class MusicServiceManager: ObservableObject {
             self.searchResults.removeAll()
         }
         
-        // Search all configured providers concurrently
+        // Get only enabled and configured providers
+        let enabledProviders = getEnabledProviders()
+        
+        // Search all enabled providers concurrently
         await withTaskGroup(of: (String, MusicServiceResult?).self) { group in
-            for provider in providers where provider.isConfigured {
+            for provider in enabledProviders {
                 group.addTask {
                     do {
                         // Try exact search first
