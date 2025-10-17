@@ -10,6 +10,62 @@ class YouTubeMusicServiceProvider: MusicServiceProvider {
         return SettingsManager.shared.hasAPIKey(for: .youtubeAPIKey)
     }
     
+    // MARK: - Video Details Fetching
+    func getVideoDetails(videoId: String) async throws -> TrackInfo? {
+        guard isConfigured else {
+            throw MusicServiceError.notConfigured
+        }
+        
+        guard let apiKey = SettingsManager.shared.retrieveAPIKey(for: .youtubeAPIKey) else {
+            throw MusicServiceError.notConfigured
+        }
+        
+        let url = URL(string: "https://www.googleapis.com/youtube/v3/videos?part=snippet&id=\(videoId)&key=\(apiKey)")!
+        
+        let (data, response) = try await URLSession.shared.data(from: url)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw MusicServiceError.invalidResponse
+        }
+        
+        let videoResponse = try JSONDecoder().decode(YouTubeVideoResponse.self, from: data)
+        
+        guard let video = videoResponse.items.first else {
+            throw MusicServiceError.noResults
+        }
+        
+        // Parse title to extract artist and song name
+        let title = video.snippet.title
+        let (artist, songTitle) = parseVideoTitle(title)
+        
+        return TrackInfo(
+            trackId: video.id,
+            title: songTitle,
+            album: "Unknown Album",
+            artist: artist
+        )
+    }
+    
+    private func parseVideoTitle(_ title: String) -> (artist: String, title: String) {
+        // Common patterns: "Artist - Song", "Artist: Song", "Song by Artist"
+        let separators = [" - ", " – ", " — ", ": ", " by "]
+        
+        for separator in separators {
+            if title.contains(separator) {
+                let components = title.components(separatedBy: separator)
+                if components.count >= 2 {
+                    let artist = components[0].trimmingCharacters(in: .whitespacesAndNewlines)
+                    let songTitle = components[1].trimmingCharacters(in: .whitespacesAndNewlines)
+                    return (artist, songTitle)
+                }
+            }
+        }
+        
+        // If no pattern matches, return the full title as song name
+        return ("Unknown Artist", title)
+    }
+    
     private var apiKey: String? {
         return SettingsManager.shared.retrieveAPIKey(for: .youtubeAPIKey)
     }
@@ -162,6 +218,16 @@ struct YouTubeSearchItem: Codable {
 
 struct YouTubeVideoId: Codable {
     let videoId: String
+}
+
+// MARK: - YouTube Video Response Models
+struct YouTubeVideoResponse: Codable {
+    let items: [YouTubeVideo]
+}
+
+struct YouTubeVideo: Codable {
+    let id: String
+    let snippet: YouTubeVideoSnippet
 }
 
 struct YouTubeVideoSnippet: Codable {

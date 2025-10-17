@@ -16,6 +16,35 @@ class SpotifyServiceProvider: MusicServiceProvider {
                settingsManager.hasAPIKey(for: .spotifyClientSecret)
     }
     
+    // MARK: - Track Details Fetching
+    func getTrackDetails(trackId: String) async throws -> TrackInfo? {
+        guard isConfigured else {
+            throw MusicServiceError.notConfigured
+        }
+        
+        let accessToken = try await getAccessToken()
+        
+        let url = URL(string: "https://api.spotify.com/v1/tracks/\(trackId)")!
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw MusicServiceError.invalidResponse
+        }
+        
+        let trackResponse = try JSONDecoder().decode(SpotifyTrack.self, from: data)
+        
+        return TrackInfo(
+            trackId: trackResponse.id,
+            title: trackResponse.name,
+            album: trackResponse.album.name,
+            artist: trackResponse.artists.first?.name ?? "Unknown Artist"
+        )
+    }
+    
     private var clientId: String? {
         return SettingsManager.shared.retrieveAPIKey(for: .spotifyClientId)
     }

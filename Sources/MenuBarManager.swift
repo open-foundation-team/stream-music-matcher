@@ -7,6 +7,7 @@ class MenuBarManager: ObservableObject {
     private var appleMusicMonitor: SimplifiedAppleMusicMonitor
     private var musicServiceManager: MusicServiceManager
     private var settingsWindowController: SettingsWindowController?
+    private var urlInputWindowController: URLInputWindowController?
     private var menuDelegate: MenuDelegate?
     
     @Published var isSearching: Bool = false
@@ -281,6 +282,11 @@ class MenuBarManager: ObservableObject {
         settingsItem.target = self
         menu.addItem(settingsItem)
         
+        // URL Input option
+        let urlInputItem = NSMenuItem(title: "Find Track from URL...", action: #selector(openURLInput), keyEquivalent: "u")
+        urlInputItem.target = self
+        menu.addItem(urlInputItem)
+        
         menu.addItem(NSMenuItem.separator())
         
         // Quit option
@@ -328,6 +334,16 @@ class MenuBarManager: ObservableObject {
         
         settingsWindowController?.showWindow(nil)
         settingsWindowController?.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+    
+    @objc private func openURLInput() {
+        if urlInputWindowController == nil {
+            urlInputWindowController = URLInputWindowController()
+        }
+        
+        urlInputWindowController?.showWindow(nil)
+        urlInputWindowController?.window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
     

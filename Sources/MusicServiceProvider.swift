@@ -49,6 +49,7 @@ class MusicServiceManager: ObservableObject {
         // Initialize all available music service providers
         allProviders.append(SpotifyServiceProvider())
         allProviders.append(YouTubeMusicServiceProvider())
+        allProviders.append(AppleMusicServiceProvider())
     }
     
     private func getEnabledProviders() -> [any MusicServiceProvider] {
