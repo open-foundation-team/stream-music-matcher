@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+  <!-- Music note with connection/link symbol -->
+  <g fill="currentColor">
+    <!-- Main music note -->
+    <path d="M12 2.5c0-.28-.22-.5-.5-.5h-1c-.28 0-.5.22-.5.5v6.5c-.28-.16-.61-.25-1-.25-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2V5.5l2-1V2.5z"/>
+    
+    <!-- Connection/link arrows -->
+    <path d="M3 6.5c0-.28.22-.5.5-.5h2c.28 0 .5.22.5.5s-.22.5-.5.5h-2c-.28 0-.5-.22-.5-.5z"/>
+    <path d="M3 8.5c0-.28.22-.5.5-.5h1.5c.28 0 .5.22.5.5s-.22.5-.5.5H3.5c-.28 0-.5-.22-.5-.5z"/>
+    
+    <!-- Small arrow indicating transfer/matching -->
+    <path d="M6.5 7l1.5 1-1.5 1v-.5H5v-1h1.5V7z"/>
+  </g>
+</svg>
