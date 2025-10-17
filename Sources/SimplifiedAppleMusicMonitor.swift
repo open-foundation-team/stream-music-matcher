@@ -18,7 +18,7 @@ class SimplifiedAppleMusicMonitor: ObservableObject {
     
     func startMonitoring() {
         timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            self?.checkCurrentTrack()
+            self?.performTrackCheck()
         }
     }
     
@@ -27,7 +27,12 @@ class SimplifiedAppleMusicMonitor: ObservableObject {
         timer = nil
     }
     
-    private func checkCurrentTrack() {
+    // Public method to allow external refresh requests
+    func checkCurrentTrack() {
+        performTrackCheck()
+    }
+    
+    private func performTrackCheck() {
         // Check if Music app is running
         let runningApps = NSWorkspace.shared.runningApplications
         let musicApp = runningApps.first { $0.bundleIdentifier == "com.apple.Music" }

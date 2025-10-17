@@ -7,11 +7,14 @@ class MenuBarManager: ObservableObject {
     private var appleMusicMonitor: SimplifiedAppleMusicMonitor
     private var musicServiceManager: MusicServiceManager
     private var settingsWindowController: SettingsWindowController?
+    private var menuDelegate: MenuDelegate?
     
     @Published var isSearching: Bool = false
     @Published var lastError: String?
     
     private var cancellables = Set<AnyCancellable>()
+    private var refreshTimer: Timer?
+    private var isMenuOpen: Bool = false
     
     init() {
         self.appleMusicMonitor = SimplifiedAppleMusicMonitor()
@@ -19,6 +22,7 @@ class MenuBarManager: ObservableObject {
         
         setupStatusItem()
         setupObservers()
+        setupPeriodicRefresh()
     }
     
     private func setupStatusItem() {
@@ -37,7 +41,17 @@ class MenuBarManager: ObservableObject {
             }
         }
         
+        // Set up menu delegate to track when menu opens/closes
+        setupMenuDelegate()
         updateMenu()
+    }
+    
+    private func setupMenuDelegate() {
+        // Create a custom menu that tracks open/close state
+        let menu = NSMenu()
+        menuDelegate = MenuDelegate(manager: self)
+        menu.delegate = menuDelegate
+        statusItem?.menu = menu
     }
     
     func setCustomIcon(_ iconName: String) {
@@ -67,13 +81,23 @@ class MenuBarManager: ObservableObject {
     private func setupObservers() {
         // Observe changes in Apple Music track
         appleMusicMonitor.$currentTrack
+            .debounce(for: .milliseconds(100), scheduler: DispatchQueue.main)
             .sink { [weak self] track in
                 self?.handleTrackChange(track)
             }
             .store(in: &cancellables)
         
+        // Observe changes in Apple Music playing state
+        appleMusicMonitor.$isPlaying
+            .debounce(for: .milliseconds(100), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateMenu()
+            }
+            .store(in: &cancellables)
+        
         // Observe changes in music service search results
         musicServiceManager.$searchResults
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.updateMenu()
             }
@@ -89,10 +113,77 @@ class MenuBarManager: ObservableObject {
         
         // Observe changes in provider enabled state
         SettingsManager.shared.$enabledProviders
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.updateMenu()
             }
             .store(in: &cancellables)
+        
+        // Observe API key configuration changes
+        SettingsManager.shared.$apiKeysConfigured
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateMenu()
+            }
+            .store(in: &cancellables)
+    }
+    
+    private func setupPeriodicRefresh() {
+        // Set up a timer for periodic refresh when menu is open
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            
+            if self.isMenuOpen {
+                // More frequent updates when menu is open
+                self.refreshMenuIfNeeded()
+            } else {
+                // Less frequent background updates to catch changes
+                self.performBackgroundStatusCheck()
+            }
+        }
+    }
+    
+    private func performBackgroundStatusCheck() {
+        // Lightweight background check every few seconds
+        // Only update if there are significant changes
+        let previousTrack = appleMusicMonitor.currentTrack
+        let previousPlayingState = appleMusicMonitor.isPlaying
+        
+        appleMusicMonitor.checkCurrentTrack()
+        
+        // Check if there's a meaningful change that warrants a menu update
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            let currentTrack = self.appleMusicMonitor.currentTrack
+            let currentPlayingState = self.appleMusicMonitor.isPlaying
+            
+            let trackChanged = previousTrack?.title != currentTrack?.title ||
+                              previousTrack?.artist != currentTrack?.artist
+            let playingStateChanged = previousPlayingState != currentPlayingState
+            
+            if trackChanged || playingStateChanged {
+                self.updateMenu()
+            }
+        }
+    }
+    
+    private func refreshMenuIfNeeded() {
+        // Force a fresh check of the current track and update menu
+        appleMusicMonitor.checkCurrentTrack()
+        
+        // Update menu with latest information
+        DispatchQueue.main.async {
+            self.updateMenu()
+        }
+    }
+    
+    func menuWillOpen() {
+        isMenuOpen = true
+        // Immediately refresh when menu opens
+        refreshMenuIfNeeded()
+    }
+    
+    func menuDidClose() {
+        isMenuOpen = false
     }
     
     private func handleTrackChange(_ track: TrackInfo?) {
@@ -186,7 +277,7 @@ class MenuBarManager: ObservableObject {
         menu.addItem(NSMenuItem.separator())
         
         // Settings option
-        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ",")
+        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: "")
         settingsItem.target = self
         menu.addItem(settingsItem)
         
@@ -258,8 +349,27 @@ class MenuBarManager: ObservableObject {
     }
     
     deinit {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
         statusItem = nil
+        cancellables.removeAll()
     }
 }
 
-// MARK: - Combine Import (already imported above)
+// MARK: - Menu Delegate
+class MenuDelegate: NSObject, NSMenuDelegate {
+    weak var manager: MenuBarManager?
+    
+    init(manager: MenuBarManager) {
+        self.manager = manager
+        super.init()
+    }
+    
+    func menuWillOpen(_ menu: NSMenu) {
+        manager?.menuWillOpen()
+    }
+    
+    func menuDidClose(_ menu: NSMenu) {
+        manager?.menuDidClose()
+    }
+}
